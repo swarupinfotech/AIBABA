@@ -42,3 +42,6 @@ yarn-error.log*
 # generated
 /prisma/dev.db
 /prisma/dev.db-journal
+
+# generated at deploy time (Vercel build derives a PostgreSQL schema)
+/prisma/.gen/

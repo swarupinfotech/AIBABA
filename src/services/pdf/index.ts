@@ -15,19 +15,44 @@ const BROWSER_CANDIDATES = [
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 ].filter(Boolean) as string[];
 
-async function findBrowser(): Promise<string | null> {
+const BASE_ARGS = ["--no-sandbox", "--disable-dev-shm-usage", "--font-render-hinting=medium"];
+
+interface BrowserTarget {
+  executablePath: string;
+  args: string[];
+}
+
+/**
+ * Serverless runtimes (Vercel/Lambda) have no system browser. There we use the
+ * packaged @sparticuz/chromium build, which unpacks a pinned Chromium into /tmp
+ * on first use. Everywhere else the local Chrome/Edge installation wins.
+ */
+async function packagedChromium(): Promise<BrowserTarget | null> {
+  const serverless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  if (!serverless) return null;
+  try {
+    const chromium = (await import("@sparticuz/chromium")).default;
+    return { executablePath: await chromium.executablePath(), args: [...chromium.args, ...BASE_ARGS] };
+  } catch {
+    return null;
+  }
+}
+
+async function findBrowser(): Promise<BrowserTarget | null> {
   for (const candidate of BROWSER_CANDIDATES) {
     try {
       await fs.access(candidate);
-      return candidate;
+      return { executablePath: candidate, args: BASE_ARGS };
     } catch {
       /* try next */
     }
   }
-  return null;
+  return packagedChromium();
 }
 
 export async function pdfAvailable(): Promise<boolean> {
+  // On Vercel the packaged browser is resolved (and extracted) at render time.
+  if (process.env.VERCEL) return true;
   return (await findBrowser()) !== null;
 }
 
@@ -235,16 +260,16 @@ ${sections}
 }
 
 export async function renderReportPdf(document: ReportDocument): Promise<Buffer> {
-  const executablePath = await findBrowser();
-  if (!executablePath) {
+  const target = await findBrowser();
+  if (!target) {
     throw new Error("PDF_RENDERER_UNAVAILABLE");
   }
   const fonts = await fontCss();
   const html = htmlDocument(document, fonts);
   const browser = await puppeteer.launch({
-    executablePath,
+    executablePath: target.executablePath,
     headless: true,
-    args: ["--no-sandbox", "--disable-dev-shm-usage", "--font-render-hinting=medium"],
+    args: target.args,
   });
   try {
     const page = await browser.newPage();

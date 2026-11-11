@@ -118,6 +118,12 @@ The schema intentionally avoids provider-specific JSON types. To switch:
 
 ## 5. Storage
 
+### Vercel Blob (serverless)
+
+Set `STORAGE_PROVIDER=vercel` and provide `BLOB_READ_WRITE_TOKEN` (the Vercel Blob integration injects it automatically). Blobs are written with `BLOB_ACCESS`, which defaults to `private`; reads happen server-side with the token and downloads still pass through `/api/v1/uploads/:id/file` with the owner check and HMAC signature. No blob URL is exposed to the browser.
+
+The store must match `BLOB_ACCESS`: a private store rejects `access: "public"` writes and vice versa.
+
 ### S3-compatible (recommended)
 
 Set `STORAGE_PROVIDER=s3` plus bucket, region and credentials. Objects are written with `ServerSideEncryption: AES256` and are never public. Uploads use a presigned `PUT`; previews use short-lived presigned `GET` URLs or the app’s signed route.
@@ -245,3 +251,72 @@ No Redis-backed cache is required today. Add one only when measured.
 - [ ] Privacy policy, terms and consent text reviewed for the operating jurisdiction.
 - [ ] Deletion and export flows tested against production configuration.
 - [ ] Provider DPAs and data-residency requirements reviewed.
+
+## 14. Vercel (serverless)
+
+The repository ships a Vercel-specific build path. Local development and tests stay on SQLite; the deploy derives a PostgreSQL schema at build time without modifying the committed one.
+
+### 14.1 How the build works
+
+`npm run vercel-build` (Vercel detects the `vercel-build` script automatically) runs `scripts/vercel-build.mjs`, which:
+
+1. copies `prisma/schema.prisma` to `prisma/.gen/schema.prisma`;
+2. swaps the datasource provider to `postgresql` and adds `binaryTargets` for Vercel's Amazon Linux runtimes;
+3. runs `prisma generate` from the generated schema;
+4. runs `next build`.
+
+`prisma/.gen/` is git-ignored. Never run `prisma migrate deploy` on Vercel against the SQLite migration folder; apply the schema once from your machine (see 14.4).
+
+### 14.2 Environment variables
+
+Set these in the Vercel project (Production and Preview):
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string. Use the pooled URL when the provider offers one (Neon `-pooler`, Supabase port 6543). |
+| `NEXT_PUBLIC_APP_URL` | The final HTTPS origin, e.g. `https://aibaba.vercel.app` |
+| `AUTH_SECRET` | 48+ random characters |
+| `DATA_ENCRYPTION_KEY` | base64-encoded 32 bytes |
+| `STORAGE_PROVIDER` | `vercel` |
+| `BLOB_READ_WRITE_TOKEN` | injected by the Vercel Blob integration |
+| `BLOB_ACCESS` | `private` |
+| `AI_PROVIDER` | `local` (or `openai` / `gemini` with keys) |
+| `CRON_SECRET` | random string; Vercel sends it as a Bearer token to the cron route |
+| `SEED_DEMO_ACCOUNTS` | `false` for anything public |
+
+`NODE_ENV` is managed by Vercel; do not set it manually.
+
+### 14.3 Services
+
+- **Database** — Vercel Postgres (Neon-backed) from the Marketplace, or any PostgreSQL 14+ instance.
+- **Blob** — a private Vercel Blob store connected to the project.
+- **PDF** — `@sparticuz/chromium` is bundled; `pdfAvailable()` reports `true` on Vercel and the browser is unpacked to `/tmp` on first render. Expect the first PDF request to be slow.
+- **Queue** — there is no long-running worker. The processing page advances its own reading through the owner-only `tick` endpoint, and `vercel.json` schedules a daily `GET /api/cron/jobs` (authenticated with `CRON_SECRET`) to drain anything left behind. On Hobby plans keep the daily schedule; per-minute crons require a plan that allows them.
+
+### 14.4 First-time database setup
+
+From a machine that holds the production `DATABASE_URL`:
+
+```bash
+npm run vercel-build          # generates the PostgreSQL client and builds
+npx prisma db push --schema prisma/.gen/schema.prisma
+DATABASE_URL="<prod url>" SEED_DEMO_ACCOUNTS=false npx tsx prisma/seed.ts
+npx prisma generate           # restore the local SQLite client afterwards
+```
+
+`db push` creates the schema in an empty database. For schema evolution after launch, generate a PostgreSQL baseline migration from `prisma/.gen/schema.prisma` and switch to `prisma migrate deploy`.
+
+### 14.5 Deploy and verify
+
+```bash
+vercel link
+vercel --prod
+```
+
+Verify, in order: `GET /api/health` returns `200`; registration works; a palm upload completes and the preview renders through the signed route; a reading reaches `PARTIALLY_COMPLETED`; the PDF downloads; a share link opens; deletion removes the reading and its blob.
+
+### 14.6 Serverless limits
+
+- Request duration caps apply to `tick` and PDF rendering. The local AI provider is fast, but a vision provider or large PDF can exceed the limit; on failure the reading stays retryable.
+- Serverless instances do not share memory, so the in-memory rate limiter is per-instance on Vercel. Replace it with Redis before real traffic.
+- `sharp` and Prisma run on the Node.js runtime; do not switch those routes to the Edge runtime.

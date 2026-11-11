@@ -22,7 +22,10 @@ const EnvSchema = z.object({
   ASTROLOGY_PROVIDER_API_KEY: z.string().optional().default(""),
   ASTROLOGY_PROVIDER_URL: z.string().optional().default(""),
   ASTROLOGY_DEFAULT_AYANAMSA: z.string().default("LAHIRI"),
-  STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
+  STORAGE_PROVIDER: z.enum(["local", "s3", "vercel"]).default("local"),
+  // Vercel Blob. Private stores require the read/write token for server-side reads.
+  BLOB_READ_WRITE_TOKEN: z.string().optional().default(""),
+  BLOB_ACCESS: z.enum(["public", "private"]).default("private"),
   STORAGE_BUCKET: z.string().optional().default(""),
   STORAGE_ACCESS_KEY: z.string().optional().default(""),
   STORAGE_SECRET_KEY: z.string().optional().default(""),
@@ -33,6 +36,8 @@ const EnvSchema = z.object({
   EMAIL_API_KEY: z.string().optional().default(""),
   EMAIL_FROM: z.string().default("readings@aibaba.local"),
   CHROMIUM_EXECUTABLE_PATH: z.string().optional().default(""),
+  // Vercel cron invocations send `Authorization: Bearer $CRON_SECRET`.
+  CRON_SECRET: z.string().optional().default(""),
   PAYMENTS_ENABLED: boolFromString,
   PAYMENT_PROVIDER: z.string().default("razorpay"),
   RAZORPAY_KEY_ID: z.string().optional().default(""),

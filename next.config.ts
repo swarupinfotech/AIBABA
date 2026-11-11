@@ -6,14 +6,19 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
-  serverExternalPackages: ["@prisma/client", "sharp", "puppeteer-core"],
+  serverExternalPackages: ["@prisma/client", "sharp", "puppeteer-core", "@sparticuz/chromium"],
   experimental: {
     serverActions: {
       bodySizeLimit: "12mb",
     },
   },
   outputFileTracingIncludes: {
-    "/**": ["./src/assets/fonts/**"],
+    "/**": [
+      "./src/assets/fonts/**",
+      "./node_modules/@sparticuz/chromium/bin/**",
+      "./node_modules/.prisma/client/**",
+      "./node_modules/@prisma/client/**",
+    ],
   },
   async redirects() {
     return [

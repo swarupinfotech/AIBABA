@@ -153,11 +153,77 @@ export class S3StorageService implements StorageService {
   }
 }
 
+/**
+ * Vercel Blob. Blobs are written with an explicit `access` mode (private by
+ * default) and are read server-side with the read/write token. Downloads still
+ * pass through the app's signed route, so no store URL is ever exposed.
+ */
+export class VercelBlobStorageService implements StorageService {
+  private readonly token = env.BLOB_READ_WRITE_TOKEN;
+  private readonly access = env.BLOB_ACCESS;
+
+  private assertConfigured(): void {
+    if (!this.token) {
+      throw new Error("BLOB_READ_WRITE_TOKEN is required when STORAGE_PROVIDER=vercel");
+    }
+  }
+
+  async put(key: string, body: Buffer, contentType: string): Promise<void> {
+    assertSafeStorageKey(key);
+    this.assertConfigured();
+    const { put } = await import("@vercel/blob");
+    await put(key, body, {
+      access: this.access,
+      token: this.token,
+      contentType,
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 60,
+    });
+  }
+
+  async get(key: string): Promise<Buffer> {
+    assertSafeStorageKey(key);
+    this.assertConfigured();
+    const { get } = await import("@vercel/blob");
+    const result = await get(key, { access: this.access, token: this.token });
+    if (!result || result.statusCode !== 200) {
+      throw new Error(`BLOB_NOT_FOUND: ${key}`);
+    }
+    return Buffer.from(await new Response(result.stream).arrayBuffer());
+  }
+
+  async delete(key: string): Promise<void> {
+    assertSafeStorageKey(key);
+    this.assertConfigured();
+    const { del } = await import("@vercel/blob");
+    try {
+      await del(key, { token: this.token });
+    } catch {
+      /* Deleting an already-absent blob is not an error. */
+    }
+  }
+
+  async exists(key: string): Promise<boolean> {
+    assertSafeStorageKey(key);
+    this.assertConfigured();
+    const { head } = await import("@vercel/blob");
+    try {
+      await head(key, { token: this.token });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
 let cached: StorageService | null = null;
 
 export function storage(): StorageService {
   if (!cached) {
-    cached = env.STORAGE_PROVIDER === "s3" ? new S3StorageService() : new LocalStorageService();
+    if (env.STORAGE_PROVIDER === "s3") cached = new S3StorageService();
+    else if (env.STORAGE_PROVIDER === "vercel") cached = new VercelBlobStorageService();
+    else cached = new LocalStorageService();
   }
   return cached;
 }

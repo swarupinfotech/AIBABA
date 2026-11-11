@@ -15,6 +15,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "worker": "tsx scripts/worker.ts",
+    "vercel-build": "node scripts/vercel-build.mjs",
     "e2e": "tsx tests/e2e/journey.ts"
   },
   "prisma": {
@@ -24,6 +25,8 @@
     "@aws-sdk/client-s3": "^3.1165.0",
     "@aws-sdk/s3-request-presigner": "^3.1165.0",
     "@prisma/client": "^6.19.3",
+    "@sparticuz/chromium": "^153.0.0",
+    "@vercel/blob": "^2.9.0",
     "astronomy-engine": "^2.1.19",
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.17",
