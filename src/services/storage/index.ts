@@ -162,19 +162,25 @@ export class VercelBlobStorageService implements StorageService {
   private readonly token = env.BLOB_READ_WRITE_TOKEN;
   private readonly access = env.BLOB_ACCESS;
 
-  private assertConfigured(): void {
-    if (!this.token) {
-      throw new Error("BLOB_READ_WRITE_TOKEN is required when STORAGE_PROVIDER=vercel");
+  /**
+   * A static read/write token is used when present. Otherwise the adapter relies
+   * on the store-scoped OIDC credentials that Vercel injects at runtime
+   * (`BLOB_STORE_ID` + `VERCEL_OIDC_TOKEN`), so no long-lived secret is stored.
+   */
+  private options(): { access: "public" | "private"; token?: string; storeId?: string } {
+    if (this.token) return { access: this.access, token: this.token };
+    const storeId = process.env.BLOB_STORE_ID ?? env.BLOB_STORE_ID;
+    if (!storeId) {
+      throw new Error("Vercel Blob requires BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID with OIDC credentials");
     }
+    return { access: this.access, storeId };
   }
 
   async put(key: string, body: Buffer, contentType: string): Promise<void> {
     assertSafeStorageKey(key);
-    this.assertConfigured();
     const { put } = await import("@vercel/blob");
     await put(key, body, {
-      access: this.access,
-      token: this.token,
+      ...this.options(),
       contentType,
       addRandomSuffix: false,
       allowOverwrite: true,
@@ -184,9 +190,8 @@ export class VercelBlobStorageService implements StorageService {
 
   async get(key: string): Promise<Buffer> {
     assertSafeStorageKey(key);
-    this.assertConfigured();
     const { get } = await import("@vercel/blob");
-    const result = await get(key, { access: this.access, token: this.token });
+    const result = await get(key, this.options());
     if (!result || result.statusCode !== 200) {
       throw new Error(`BLOB_NOT_FOUND: ${key}`);
     }
@@ -195,10 +200,9 @@ export class VercelBlobStorageService implements StorageService {
 
   async delete(key: string): Promise<void> {
     assertSafeStorageKey(key);
-    this.assertConfigured();
     const { del } = await import("@vercel/blob");
     try {
-      await del(key, { token: this.token });
+      await del(key, this.options());
     } catch {
       /* Deleting an already-absent blob is not an error. */
     }
@@ -206,10 +210,9 @@ export class VercelBlobStorageService implements StorageService {
 
   async exists(key: string): Promise<boolean> {
     assertSafeStorageKey(key);
-    this.assertConfigured();
     const { head } = await import("@vercel/blob");
     try {
-      await head(key, { token: this.token });
+      await head(key, this.options());
       return true;
     } catch {
       return false;

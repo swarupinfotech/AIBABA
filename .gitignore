@@ -45,3 +45,5 @@ yarn-error.log*
 
 # generated at deploy time (Vercel build derives a PostgreSQL schema)
 /prisma/.gen/
+.vercel
+.env*

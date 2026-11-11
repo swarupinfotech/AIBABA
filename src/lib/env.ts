@@ -23,8 +23,9 @@ const EnvSchema = z.object({
   ASTROLOGY_PROVIDER_URL: z.string().optional().default(""),
   ASTROLOGY_DEFAULT_AYANAMSA: z.string().default("LAHIRI"),
   STORAGE_PROVIDER: z.enum(["local", "s3", "vercel"]).default("local"),
-  // Vercel Blob. Private stores require the read/write token for server-side reads.
+  // Vercel Blob. Prefer OIDC (BLOB_STORE_ID) or a static read/write token.
   BLOB_READ_WRITE_TOKEN: z.string().optional().default(""),
+  BLOB_STORE_ID: z.string().optional().default(""),
   BLOB_ACCESS: z.enum(["public", "private"]).default("private"),
   STORAGE_BUCKET: z.string().optional().default(""),
   STORAGE_ACCESS_KEY: z.string().optional().default(""),
