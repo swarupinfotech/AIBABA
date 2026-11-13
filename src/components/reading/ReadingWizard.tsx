@@ -752,7 +752,12 @@ function StepPalm({
       </p>
 
       <div className="mt-6">
-        <p className="label">Dominant hand</p>
+        <p className="label">
+          Dominant hand
+          <span className="ml-2 text-[0.62rem] font-bold uppercase tracking-[0.08em] text-[#8a86a0]">
+            Required
+          </span>
+        </p>
         <div className="mt-2 flex gap-2">
           {[
             { value: "LEFT", label: "Left" },
@@ -778,9 +783,9 @@ function StepPalm({
       </div>
 
       <div className="mt-6 rounded-xl border border-[#efdcae] bg-[#fdf6e6] px-4 py-3 text-[0.76rem] leading-relaxed text-[#8a6420]">
-        <strong>What the palm module can and cannot do.</strong> With the local development interpreter,
-        no vision model is configured, so palm features are marked NOT_ASSESSED and the component returns a
-        LIMITED result. That is deliberate: the application never fabricates line readings.
+        <strong>What palm reading can and cannot do here.</strong> Palm lines are interpreted only when
+        image analysis is available for your reading. When it is not, the palm section says so plainly
+        instead of describing lines it could not see. We never invent a line reading to fill the gap.
       </div>
     </div>
   );

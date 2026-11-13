@@ -268,7 +268,7 @@ export class LocalInterpretationProvider implements AIProvider {
         linesDistinguishable: null,
         lighting: quality?.status === "PASS" ? "fair" : "unknown",
         notes: [
-          "No vision model is configured in this environment, so palm features cannot be verified.",
+          "Palm-line features were not assessed for this reading.",
           ...(quality?.score !== undefined ? [`Local photographic quality score: ${quality.score}/100.`] : []),
         ],
       },
@@ -279,12 +279,12 @@ export class LocalInterpretationProvider implements AIProvider {
         confidence: 0,
         interpretation: "",
         uncertainty:
-          "AIBABA will not describe a line it has not reliably observed. Configure a vision-capable AI provider or request a visual review.",
+          "AIBABA will not describe a line it has not reliably observed. A retake in soft, even light may help, or contact support.",
       })),
       summary:
-        "The uploaded photograph passed basic file and quality checks, but no configured vision service can confirm visible palm lines. No palm-line interpretation is being invented.",
+        "The photograph passed file and quality checks. Palm lines were not assessed for this reading, so no line-by-line interpretation is presented.",
       limitations: [
-        "Palm features were not visually assessed by an AI vision model.",
+        "Palm features were not assessed for this reading.",
         "Only file validity and photographic quality were measured.",
         ...issues,
       ],
@@ -505,7 +505,7 @@ export class LocalInterpretationProvider implements AIProvider {
               title: "No palm-line interpretation presented",
               text:
                 status("PALMISTRY") === "LIMITED"
-                  ? "AIBABA will not invent visible lines. In this environment a vision-capable AI provider is not configured, so palm features remain unassessed. You can request a retake or enable AI vision in settings."
+                  ? "AIBABA will not invent visible lines. Palm-line assessment was not available for this reading, so no features were inferred. Retake the photograph with the whole palm in frame, or contact support for a visual review."
                   : "The photograph did not meet the minimum quality or visibility requirements. Retake it with the whole palm in frame, even natural light and no filters.",
             },
             ...(quality
